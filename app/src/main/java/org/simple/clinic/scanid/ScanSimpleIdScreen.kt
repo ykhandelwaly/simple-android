@@ -18,11 +18,14 @@ import androidx.camera.core.CameraSelector
 import androidx.camera.core.FocusMeteringAction
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
+import androidx.camera.core.resolutionselector.AspectRatioStrategy
+import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.GoogleApiAvailability
 import com.google.android.material.snackbar.Snackbar
+import com.google.common.util.concurrent.ListenableFuture
 import com.jakewharton.rxbinding3.widget.editorActionEvents
 import com.jakewharton.rxbinding3.widget.textChangeEvents
 import com.spotify.mobius.functions.Consumer
@@ -55,7 +58,10 @@ import org.simple.clinic.widgets.UiEvent
 import org.simple.clinic.widgets.hideKeyboard
 import java.time.Instant
 import java.util.UUID
+import java.util.concurrent.Executor
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.Future
 import javax.inject.Inject
 import kotlin.math.abs
 import kotlin.math.max
@@ -124,10 +130,9 @@ class ScanSimpleIdScreen : BaseScreen<
     get() = binding.enteredCodeContainer
 
   private val keyboardVisibilityDetector = KeyboardVisibilityDetector()
-  private val cameraExecutor = Executors.newSingleThreadExecutor()
-  private val cameraProviderFuture by unsafeLazy {
-    ProcessCameraProvider.getInstance(requireContext())
-  }
+
+  private lateinit var cameraExecutor: ExecutorService
+  private lateinit var cameraProviderFuture: ListenableFuture<ProcessCameraProvider>
 
   private val qrScans = PublishSubject.create<ScanSimpleIdEvent>()
 
@@ -157,6 +162,9 @@ class ScanSimpleIdScreen : BaseScreen<
   override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
     super.onViewCreated(view, savedInstanceState)
 
+    cameraExecutor = Executors.newSingleThreadExecutor()
+    cameraProviderFuture = ProcessCameraProvider.getInstance(requireContext())
+
     // It is possible that going back via the app bar from future screens will come back to this
     // screen with the keyboard open. So, we hide it here.
     binding.root.hideKeyboard()
@@ -170,24 +178,23 @@ class ScanSimpleIdScreen : BaseScreen<
 
   @SuppressLint("ClickableViewAccessibility")
   private fun startCamera(cameraProvider: ProcessCameraProvider) {
-    // Get screen metrics used to setup camera for full screen resolution
-    val metrics = DisplayMetrics().also { previewView.display.getRealMetrics(it) }
-
-    val screenAspectRatio = aspectRatio(metrics.widthPixels, metrics.heightPixels)
-
     val rotation = previewView.display.rotation
 
     val cameraSelector = CameraSelector.Builder()
         .requireLensFacing(CameraSelector.LENS_FACING_BACK)
         .build()
 
+    val resolutionSelector = ResolutionSelector.Builder()
+        .setAspectRatioStrategy(AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY)
+        .build()
+
     val preview = Preview.Builder()
-        .setTargetAspectRatio(screenAspectRatio)
+        .setResolutionSelector(resolutionSelector)
         .setTargetRotation(rotation)
         .build()
 
     val analyzer = ImageAnalysis.Builder()
-        .setTargetAspectRatio(screenAspectRatio)
+        .setResolutionSelector(resolutionSelector)
         .setTargetRotation(rotation)
         .build()
 
@@ -205,20 +212,24 @@ class ScanSimpleIdScreen : BaseScreen<
 
     setQrCodeAnalyzer(analyzer, qrCodeAnalyzer)
 
-    cameraProvider.unbindAll()
+    try {
+      cameraProvider.unbindAll()
 
-    val camera = cameraProvider.bindToLifecycle(viewLifecycleOwner, cameraSelector, preview, analyzer)
-    preview.setSurfaceProvider(previewView.surfaceProvider)
+      val camera = cameraProvider.bindToLifecycle(viewLifecycleOwner, cameraSelector, preview, analyzer)
+      preview.setSurfaceProvider(previewView.surfaceProvider)
 
-    previewView.setOnTouchListener { _, motionEvent ->
-      when (motionEvent.action) {
-        MotionEvent.ACTION_DOWN -> true
-        MotionEvent.ACTION_UP -> {
-          processTapToFocus(motionEvent, camera.cameraControl)
-          true
+      previewView.setOnTouchListener { _, motionEvent ->
+        when (motionEvent.action) {
+          MotionEvent.ACTION_DOWN -> true
+          MotionEvent.ACTION_UP -> {
+            processTapToFocus(motionEvent, camera.cameraControl)
+            true
+          }
+          else -> false
         }
-        else -> false
       }
+    } catch (e: Exception) {
+      // no-op
     }
   }
 
@@ -233,27 +244,6 @@ class ScanSimpleIdScreen : BaseScreen<
     val action = FocusMeteringAction.Builder(point).build()
 
     cameraControl.startFocusAndMetering(action)
-  }
-
-  /**
-   *  [androidx.camera.core.ImageAnalysis.Builder.setTargetAspectRatio] requires enum value of
-   *  [androidx.camera.core.AspectRatio]. Currently it has values of 4:3 & 16:9.
-   *
-   *  Detecting the most suitable ratio for dimensions provided in @params by counting absolute
-   *  of preview ratio to one of the provided values.
-   *
-   *  @param width - preview width
-   *  @param height - preview height
-   *  @return suitable aspect ratio
-   *
-   *  source: https://github.com/android/camera-samples/blob/bfc46b68ef51f337104d3487c2394b204cf0d453/CameraXBasic/app/src/main/java/com/android/example/cameraxbasic/fragments/CameraFragment.kt#L350
-   */
-  private fun aspectRatio(width: Int, height: Int): Int {
-    val previewRatio = max(width, height).toDouble() / min(width, height)
-    if (abs(previewRatio - RATIO_4_3_VALUE) <= abs(previewRatio - RATIO_16_9_VALUE)) {
-      return AspectRatio.RATIO_4_3
-    }
-    return AspectRatio.RATIO_16_9
   }
 
   private fun qrCodeScanned(qrCode: String) {
