@@ -444,6 +444,8 @@ dependencies {
 
   implementation(libs.sqlCipher)
 
+  implementation(libs.openTelemetry)
+
   /**
    * Unit test dependencies
    */

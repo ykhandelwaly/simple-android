@@ -43,6 +43,8 @@ ksp = "1.9.10-1.0.13"
 
 sqlCipher = "4.5.4"
 
+openTelemetry = "0.4.0-alpha"
+
 [libraries]
 android-gradle-plugin = "com.android.tools.build:gradle:8.3.1"
 android-desugaring = "com.android.tools:desugar_jdk_libs:2.0.4"
@@ -225,6 +227,8 @@ androidx-compose-test-junit = { module = "androidx.compose.ui:ui-test-junit4" }
 androidx-compose-test-manifest = { module = "androidx.compose.ui:ui-test-manifest" }
 
 sqlCipher = { module = "net.zetetic:android-database-sqlcipher", version.ref = "sqlCipher" }
+
+openTelemetry = { module = "io.opentelemetry.android:instrumentation", version.ref = "openTelemetry" }
 
 [bundles]
 androidx-camera = ["androidx-camera-core", "androidx-camera-camera2", "androidx-camera-view", "androidx-camera-lifecycle"]
