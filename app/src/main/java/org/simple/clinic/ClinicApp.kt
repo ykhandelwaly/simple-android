@@ -27,7 +27,7 @@ import org.simple.clinic.platform.crash.CrashReporter
 import org.simple.clinic.plumbing.infrastructure.UpdateInfrastructureUserDetails
 import org.simple.clinic.remoteconfig.ConfigReader
 import org.simple.clinic.storage.DatabaseEncryptor
-import org.simple.clinic.storage.monitoring.DatadogSqlPerformanceReportingSink
+import org.simple.clinic.storage.monitoring.FirebaseSqlPerformanceReportingSink
 import org.simple.clinic.storage.monitoring.SqlPerformanceReporter
 import org.simple.clinic.util.clamp
 import org.simple.clinic.util.filterTrue
@@ -100,7 +100,7 @@ abstract class ClinicApp : Application(), CameraXConfig.Provider {
     analyticsReporters.forEach { reporter ->
       Analytics.addReporter(reporter)
     }
-    SqlPerformanceReporter.addSink(DatadogSqlPerformanceReportingSink())
+    SqlPerformanceReporter.addSink(FirebaseSqlPerformanceReportingSink())
 
     registerActivityLifecycleCallbacks(closeActivitiesWhenUserIsUnauthorized)
   }

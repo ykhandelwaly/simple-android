@@ -1,11 +1,11 @@
 package org.simple.clinic.storage.monitoring
 
-import io.opentracing.Span
-import io.opentracing.util.GlobalTracer
+import com.google.firebase.perf.FirebasePerformance
+import com.google.firebase.perf.metrics.Trace
 import org.simple.clinic.storage.monitoring.SqlPerformanceReporter.ReportSink
 import org.simple.clinic.storage.monitoring.SqlPerformanceReporter.SqlOperation
 
-class DatadogSqlPerformanceReportingSink : ReportSink {
+class FirebaseSqlPerformanceReportingSink : ReportSink {
 
   /**
    * Maintains the list of running spans for every DB call.
@@ -16,21 +16,23 @@ class DatadogSqlPerformanceReportingSink : ReportSink {
    *
    * Something to investigate at a later date.
    **/
-  private var runningSpans = emptyMap<SqlOperation, Span>()
+  private var runningSpans = emptyMap<SqlOperation, Trace>()
 
   override fun begin(operation: SqlOperation) {
-    val tracer = GlobalTracer.get()
-    val span = tracer
-        .buildSpan("room.query")
-        .withTag("dao", operation.daoName)
-        .withTag("method", operation.methodName)
-        .start()
+    val trace = FirebasePerformance.getInstance()
+        .newTrace("room.query")
+        .apply {
+          putAttribute("dao", operation.daoName)
+          putAttribute("method", operation.methodName)
 
-    runningSpans = runningSpans + (operation to span)
+          start()
+        }
+
+    runningSpans = runningSpans + (operation to trace)
   }
 
   override fun end(operation: SqlOperation) {
-    val spanForOperation = runningSpans[operation]
+    val traceForOperation = runningSpans[operation]
 
     /*
     * There is a possibility for a completed operation to not be present in the list of running
@@ -40,8 +42,8 @@ class DatadogSqlPerformanceReportingSink : ReportSink {
     * In this scenario, we'll just not report this span since the cost of thread synchronisation is
     * not worth the small chances of a span being lost.
     **/
-    if (spanForOperation != null) {
-      spanForOperation.finish()
+    if (traceForOperation != null) {
+      traceForOperation.stop()
       runningSpans = runningSpans - operation
     }
   }
