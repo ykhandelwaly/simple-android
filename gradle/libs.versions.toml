@@ -104,6 +104,7 @@ faker = "com.github.blocoio:faker:1.2.9"
 
 firebase-config = "com.google.firebase:firebase-config:21.6.3"
 firebase-analytics = "com.google.firebase:firebase-analytics-ktx:21.6.1"
+firebase-performance-monitoring = "com.google.firebase:firebase-perf-ktx:20.5.2"
 
 flipper-flipper = { module = "com.facebook.flipper:flipper", version.ref = "flipper" }
 flipper-networkPlugin = { module = "com.facebook.flipper:flipper-network-plugin", version.ref = "flipper" }

@@ -373,6 +373,7 @@ dependencies {
 
   implementation(libs.firebase.config)
   implementation(libs.firebase.analytics)
+  implementation(libs.firebase.performance.monitoring)
 
   implementation(libs.itemanimators)
 
